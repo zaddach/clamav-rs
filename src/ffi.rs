@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, dead_code)]
 
-use libc::c_uint;
+use libc::{c_char, c_int, c_uint};
 
 pub const CL_INIT_DEFAULT: u32 = 0x0;
 
@@ -8,6 +8,7 @@ pub const CL_INIT_DEFAULT: u32 = 0x0;
 #[link(name = ":libclamav.so.7")]
 extern "C" {
     pub fn cl_init(initOptions: c_uint) -> cl_error;
+    pub fn cl_strerror(clerror: c_int) -> *const c_char;
 }
 
 #[repr(C)]
