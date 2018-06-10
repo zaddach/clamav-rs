@@ -1,14 +1,20 @@
 #![allow(non_camel_case_types, dead_code)]
 
-use libc::{c_char, c_int, c_uint};
+use libc::{c_char, c_int, c_uint, c_void};
 
 pub const CL_INIT_DEFAULT: u32 = 0x0;
+
+pub type cl_engine = c_void;
 
 // :libclamav.so.7 as opposed to clamav as libclamav.so may not exist
 #[link(name = ":libclamav.so.7")]
 extern "C" {
     pub fn cl_init(initOptions: c_uint) -> cl_error;
     pub fn cl_strerror(clerror: c_int) -> *const c_char;
+
+    // engine
+    pub fn cl_engine_new() -> *mut cl_engine;
+    pub fn cl_engine_free(engine: *mut cl_engine) -> cl_error;
 }
 
 #[repr(C)]
