@@ -50,6 +50,29 @@ pub fn initialize() -> Result<(), ClamError> {
     }
 }
 
+/// Engine used for scanning files
+pub struct Engine {
+    handle: *mut ffi::cl_engine,
+}
+
+impl Engine {
+    /// Initialises the engine
+    pub fn new() -> Self {
+        unsafe {
+            let handle = ffi::cl_engine_new();
+            Engine { handle }
+        }
+    }
+}
+
+impl Drop for Engine {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::cl_engine_free(self.handle);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,5 +90,10 @@ mod tests {
             err_string.contains("CL_EFORMAT"),
             "error description should contain string error"
         );
+    }
+
+    #[test]
+    fn create_new_engine_success() {
+        let _engine = Engine::new();
     }
 }
