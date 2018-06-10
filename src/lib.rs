@@ -63,6 +63,37 @@ impl Engine {
             Engine { handle }
         }
     }
+
+    /// Compiles the loaded database definitions
+    ///
+    /// This function will compile the database definitions loaded
+    /// in this engine using the [`load_database`] function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use clamav;
+    ///
+    /// clamav::initialize().expect("failed to initialize");
+    /// let engine = clamav::Engine::new();
+    /// engine.compile().expect("failed to compile");
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if compliation fails.
+    /// The [`ClamError`] returned will contain the error code.
+    ///
+    /// [`ClamError`]: struct.ClamError.html
+    pub fn compile(&self) -> Result<(), ClamError> {
+        unsafe {
+            let result = ffi::cl_engine_compile(self.handle);
+            match result {
+                ffi::cl_error::CL_SUCCESS => Ok(()),
+                _ => Err(ClamError::new(result)),
+            }
+        }
+    }
 }
 
 impl Drop for Engine {
@@ -93,7 +124,8 @@ mod tests {
     }
 
     #[test]
-    fn create_new_engine_success() {
-        let _engine = Engine::new();
+    fn compile_empty_engine_success() {
+        let engine = Engine::new();
+        assert!(engine.compile().is_ok(), "compile should succeed");
     }
 }

@@ -15,6 +15,7 @@ extern "C" {
     // engine
     pub fn cl_engine_new() -> *mut cl_engine;
     pub fn cl_engine_free(engine: *mut cl_engine) -> cl_error;
+    pub fn cl_engine_compile(engine: *mut cl_engine) -> cl_error;
 }
 
 #[repr(C)]
