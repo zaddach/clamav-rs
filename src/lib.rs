@@ -3,6 +3,7 @@ extern crate libc;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fmt;
+use std::ptr;
 use std::str;
 
 mod ffi;
@@ -67,6 +68,15 @@ pub fn default_database_directory() -> String {
 pub struct DatabaseStats {
     /// The total number of loaded signatures
     pub signature_count: u32,
+}
+
+pub enum ScanResult {
+    /// Clean result, checked against *N* signatures
+    Clean(u64),
+    /// Whitelisted result, checked against *N* signatures
+    Whitelisted(u64),
+    /// Virus result, checked against *N* signatured with detected name
+    Virus(u64, String),
 }
 
 /// Engine used for scanning files
@@ -155,6 +165,61 @@ impl Engine {
             }
         }
     }
+
+    /// Scans a file with the previously loaded and compiled definitions.
+    ///
+    /// This function will scan the given file with the the database definitions
+    /// loaded and compiled.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use clamav::{ScanResult};
+    ///
+    /// clamav::initialize().expect("failed to initialize");
+    /// let engine = clamav::Engine::new();
+    /// engine.load_databases("test_data/database/").expect("failed to load");
+    /// engine.compile().expect("failed to compile");
+    ///
+    /// let hit = engine.scan_file("test_data/files/good_file").expect("expected scan to succeed");
+    ///
+    /// match hit {
+    ///     ScanResult::Virus(count, name) => println!("Virus {}, checked {} sigs", count, name),
+    ///     ScanResult::Clean(count) => println!("Clean checked {} sigs", count),
+    ///     ScanResult::Whitelisted(count) => println!("Whitelisted file w/{} sigs", count)
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the scan fails.
+    /// The [`ClamError`] returned will contain the error code.
+    ///
+    /// [`ClamError`]: struct.ClamError.html
+    pub fn scan_file(&self, path: &str) -> Result<ScanResult, ClamError> {
+        let raw_path = CString::new(path).unwrap();
+        unsafe {
+            let mut virname: *const i8 = ptr::null();
+            let mut scanned: u64 = 0;
+            let result = ffi::cl_scanfile(
+                raw_path.as_ptr(),
+                &mut virname,
+                &mut scanned,
+                self.handle,
+                ffi::CL_SCAN_STDOPT,
+            );
+            match result {
+                ffi::cl_error::CL_CLEAN => Ok(ScanResult::Clean(scanned)),
+                ffi::cl_error::CL_BREAK => Ok(ScanResult::Whitelisted(scanned)),
+                ffi::cl_error::CL_VIRUS => {
+                    let bytes = CStr::from_ptr(virname).to_bytes();
+                    let name = str::from_utf8(bytes).ok().unwrap_or_default().to_string();
+                    Ok(ScanResult::Virus(scanned, name))
+                }
+                _ => Err(ClamError::new(result)),
+            }
+        }
+    }
 }
 
 impl Drop for Engine {
@@ -168,6 +233,11 @@ impl Drop for Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TEST_DATABASES_PATH: &'static str = "test_data/database/";
+    const EXAMPLE_DATABASE_PATH: &'static str = "test_data/database/example.cud";
+    const GOOD_FILE_PATH: &'static str = "test_data/files/good_file";
+    const NAUGHTY_FILE_PATH: &'static str = "test_data/files/naughty_file";
 
     #[test]
     fn initialize_success() {
@@ -193,7 +263,7 @@ mod tests {
     #[test]
     fn load_databases_success() {
         let engine = Engine::new();
-        let result = engine.load_databases("test_data/database/");
+        let result = engine.load_databases(TEST_DATABASES_PATH);
         assert!(result.is_ok(), "load should succeed");
         assert!(
             result.unwrap().signature_count > 0,
@@ -204,7 +274,7 @@ mod tests {
     #[test]
     fn load_databases_with_file_success() {
         let engine = Engine::new();
-        let result = engine.load_databases("test_data/database/example.cud");
+        let result = engine.load_databases(EXAMPLE_DATABASE_PATH);
         assert!(result.is_ok(), "load should succeed");
         assert!(
             result.unwrap().signature_count > 0,
@@ -227,5 +297,39 @@ mod tests {
             default_database_directory().len() > 0,
             "should have a default db dir"
         );
+    }
+
+    #[test]
+    fn scan_naughty_file_matches() {
+        let engine = Engine::new();
+        engine
+            .load_databases(EXAMPLE_DATABASE_PATH)
+            .expect("failed to load db");
+        engine.compile().expect("failed to compile");
+        let result = engine.scan_file(NAUGHTY_FILE_PATH);
+        assert!(result.is_ok(), "scan should succeed");
+        let hit = result.unwrap();
+        match hit {
+            ScanResult::Virus(_count, name) => {
+                assert_eq!(name, "naughty_file.UNOFFICIAL");
+            }
+            _ => panic!("should have matched as a virus"),
+        }
+    }
+
+    #[test]
+    fn scan_good_file_success() {
+        let engine = Engine::new();
+        engine
+            .load_databases(EXAMPLE_DATABASE_PATH)
+            .expect("failed to load db");
+        engine.compile().expect("failed to compile");
+        let result = engine.scan_file(GOOD_FILE_PATH);
+        assert!(result.is_ok(), "scan should succeed");
+        let hit = result.unwrap();
+        match hit {
+            ScanResult::Clean(_count) => {}
+            _ => panic!("should have matched as a virus"),
+        }
     }
 }
