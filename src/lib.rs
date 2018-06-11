@@ -75,12 +75,12 @@ pub struct DatabaseStats {
 }
 
 pub enum ScanResult {
-    /// Clean result, checked against *N* signatures
-    Clean(u64),
-    /// Whitelisted result, checked against *N* signatures
-    Whitelisted(u64),
-    /// Virus result, checked against *N* signatured with detected name
-    Virus(u64, String),
+    /// Clean result
+    Clean,
+    /// Whitelisted result
+    Whitelisted,
+    /// Virus result, with detected name
+    Virus(String),
 }
 
 /// Engine used for scanning files
@@ -189,9 +189,9 @@ impl Engine {
     /// let hit = engine.scan_file("test_data/files/good_file", &settings).expect("expected scan to succeed");
     ///
     /// match hit {
-    ///     ScanResult::Virus(count, name) => println!("Virus {}, checked {} sigs", count, name),
-    ///     ScanResult::Clean(count) => println!("Clean checked {} sigs", count),
-    ///     ScanResult::Whitelisted(count) => println!("Whitelisted file w/{} sigs", count)
+    ///     ScanResult::Virus(name) => println!("Virus {}", name),
+    ///     ScanResult::Clean => println!("Clean"),
+    ///     ScanResult::Whitelisted => println!("Whitelisted file")
     /// }
     /// ```
     ///
@@ -211,9 +211,9 @@ impl Engine {
     /// let hit = engine.scan_file("test_data/files/good_file", &settings).expect("expected scan to succeed");
     ///
     /// match hit {
-    ///     ScanResult::Virus(count, name) => println!("Virus {}, checked {} sigs", count, name),
-    ///     ScanResult::Clean(count) => println!("Clean checked {} sigs", count),
-    ///     ScanResult::Whitelisted(count) => println!("Whitelisted file w/{} sigs", count)
+    ///     ScanResult::Virus(name) => println!("Virus {}", name),
+    ///     ScanResult::Clean => println!("Clean"),
+    ///     ScanResult::Whitelisted => println!("Whitelisted file")
     /// }
     /// ```
     ///
@@ -231,21 +231,20 @@ impl Engine {
         let raw_path = CString::new(path).unwrap();
         unsafe {
             let mut virname: *const i8 = ptr::null();
-            let mut scanned: u64 = 0;
             let result = ffi::cl_scanfile(
                 raw_path.as_ptr(),
                 &mut virname,
-                &mut scanned,
+                ptr::null_mut(),
                 self.handle,
                 settings.flags(),
             );
             match result {
-                ffi::cl_error::CL_CLEAN => Ok(ScanResult::Clean(scanned)),
-                ffi::cl_error::CL_BREAK => Ok(ScanResult::Whitelisted(scanned)),
+                ffi::cl_error::CL_CLEAN => Ok(ScanResult::Clean),
+                ffi::cl_error::CL_BREAK => Ok(ScanResult::Whitelisted),
                 ffi::cl_error::CL_VIRUS => {
                     let bytes = CStr::from_ptr(virname).to_bytes();
                     let name = str::from_utf8(bytes).ok().unwrap_or_default().to_string();
-                    Ok(ScanResult::Virus(scanned, name))
+                    Ok(ScanResult::Virus(name))
                 }
                 _ => Err(ClamError::new(result)),
             }
@@ -342,7 +341,7 @@ mod tests {
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
-            ScanResult::Virus(_count, name) => {
+            ScanResult::Virus(name) => {
                 assert_eq!(name, "naughty_file.UNOFFICIAL");
             }
             _ => panic!("should have matched as a virus"),
@@ -361,7 +360,7 @@ mod tests {
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
-            ScanResult::Clean(_count) => {}
+            ScanResult::Clean => {}
             _ => panic!("should have matched as a virus"),
         }
     }
