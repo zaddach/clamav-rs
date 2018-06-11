@@ -234,6 +234,11 @@ impl Drop for Engine {
 mod tests {
     use super::*;
 
+    const TEST_DATABASES_PATH: &'static str = "test_data/database/";
+    const EXAMPLE_DATABASE_PATH: &'static str = "test_data/database/example.cud";
+    const GOOD_FILE_PATH: &'static str = "test_data/files/good_file";
+    const NAUGHTY_FILE_PATH: &'static str = "test_data/files/naughty_file";
+
     #[test]
     fn initialize_success() {
         assert!(initialize().is_ok(), "initialize should succeed");
@@ -258,7 +263,7 @@ mod tests {
     #[test]
     fn load_databases_success() {
         let engine = Engine::new();
-        let result = engine.load_databases("test_data/database/");
+        let result = engine.load_databases(TEST_DATABASES_PATH);
         assert!(result.is_ok(), "load should succeed");
         assert!(
             result.unwrap().signature_count > 0,
@@ -269,7 +274,7 @@ mod tests {
     #[test]
     fn load_databases_with_file_success() {
         let engine = Engine::new();
-        let result = engine.load_databases("test_data/database/example.cud");
+        let result = engine.load_databases(EXAMPLE_DATABASE_PATH);
         assert!(result.is_ok(), "load should succeed");
         assert!(
             result.unwrap().signature_count > 0,
@@ -298,10 +303,10 @@ mod tests {
     fn scan_naughty_file_matches() {
         let engine = Engine::new();
         engine
-            .load_databases("test_data/database/example.cud")
+            .load_databases(EXAMPLE_DATABASE_PATH)
             .expect("failed to load db");
         engine.compile().expect("failed to compile");
-        let result = engine.scan_file("test_data/files/naughty_file");
+        let result = engine.scan_file(NAUGHTY_FILE_PATH);
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
@@ -316,10 +321,10 @@ mod tests {
     fn scan_good_file_success() {
         let engine = Engine::new();
         engine
-            .load_databases("test_data/database/example.cud")
+            .load_databases(EXAMPLE_DATABASE_PATH)
             .expect("failed to load db");
         engine.compile().expect("failed to compile");
-        let result = engine.scan_file("test_data/files/good_file");
+        let result = engine.scan_file(GOOD_FILE_PATH);
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
