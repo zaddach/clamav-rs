@@ -41,7 +41,6 @@ mod tests {
 
     #[test]
     fn error_as_string_success() {
-        ::initialize().expect("initialize should succeed");
         let err = ClamError::new(ffi::cl_error::CL_EFORMAT);
         let err_string = err.to_string();
         assert!(

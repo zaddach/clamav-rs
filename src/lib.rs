@@ -2,6 +2,7 @@ extern crate libc;
 
 use std::ffi::CStr;
 use std::str;
+use std::sync::{Once, ONCE_INIT};
 
 mod engine;
 mod error;
@@ -14,13 +15,20 @@ pub use scan_settings::*;
 
 /// Initializes clamav
 ///
-/// This must be called once per process
+/// This must be called once per process. This is safe to call multiple times.
 pub fn initialize() -> Result<(), ClamError> {
+    // the cl_init implementation isn't thread-safe, which is painful for tests
+    static ONCE: Once = ONCE_INIT;
+    static mut RESULT: ffi::cl_error = ffi::cl_error::CL_SUCCESS;
     unsafe {
-        let result = ffi::cl_init(ffi::CL_INIT_DEFAULT);
-        match result {
+        ONCE.call_once(|| {
+            let result = ffi::cl_init(ffi::CL_INIT_DEFAULT);
+            // copy so it's safe to use outside this fn
+            RESULT = result.clone();
+        });
+        match RESULT {
             ffi::cl_error::CL_SUCCESS => Ok(()),
-            _ => Err(ClamError::new(result)),
+            _ => Err(ClamError::new(RESULT.clone())),
         }
     }
 }
