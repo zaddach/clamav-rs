@@ -6,6 +6,11 @@ pub struct ScanSettings {
     settings: u32,
 }
 
+impl Default for ScanSettings {
+    /// Returns the defualt scan settings per libclamav recommendations
+    fn default() -> ScanSettings { ScanSettings { settings: ffi::CL_SCAN_STDOPT } }
+}
+
 impl fmt::Display for ScanSettings {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut flags = String::new();
@@ -392,5 +397,11 @@ mod tests {
         assert!(string_settings.contains("CL_SCAN_SWF"));
         assert!(string_settings.contains("CL_SCAN_XMLDOCS"));
         assert!(string_settings.contains("CL_SCAN_HWP3"));
+    }
+
+    #[test]
+    fn settings_default_to_standard() {
+        let settings: ScanSettings = Default::default();
+        assert_eq!(settings.settings, ffi::CL_SCAN_STDOPT);
     }
 }
