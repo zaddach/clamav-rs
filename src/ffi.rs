@@ -24,6 +24,7 @@ extern "C" {
         signo: *mut c_uint,
         dboptions: c_uint,
     ) -> cl_error;
+    pub fn cl_retdbdir() -> *const c_char;
 }
 
 #[repr(C)]

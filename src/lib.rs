@@ -51,6 +51,18 @@ pub fn initialize() -> Result<(), ClamError> {
     }
 }
 
+/// Gets the default database directory for clamav
+pub fn default_database_directory() -> String {
+    unsafe {
+        let ptr = ffi::cl_retdbdir();
+        let bytes = CStr::from_ptr(ptr).to_bytes();
+        str::from_utf8(bytes)
+            .ok()
+            .expect("Invalid UTF8 string")
+            .to_string()
+    }
+}
+
 /// Stats of a loaded database
 pub struct DatabaseStats {
     /// The total number of loaded signatures
@@ -206,6 +218,14 @@ mod tests {
         assert!(
             engine.load_databases("/dev/null").is_err(),
             "should fail to load invalid databases"
+        );
+    }
+
+    #[test]
+    fn default_database_directory_success() {
+        assert!(
+            default_database_directory().len() > 0,
+            "should have a default db dir"
         );
     }
 }
