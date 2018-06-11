@@ -7,6 +7,7 @@ use std::ptr;
 use std::str;
 
 mod ffi;
+pub mod scan_settings;
 
 /// An error indicating a clam failure.
 #[derive(Clone, PartialEq, Eq, Debug)]
