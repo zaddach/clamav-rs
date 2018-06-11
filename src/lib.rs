@@ -7,6 +7,10 @@ use std::ptr;
 use std::str;
 
 mod ffi;
+mod scan_settings;
+
+pub type ScanSettings = scan_settings::ScanSettings;
+pub type ScanSettingsBuilder = scan_settings::ScanSettingsBuilder;
 
 /// An error indicating a clam failure.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -174,14 +178,37 @@ impl Engine {
     /// # Examples
     ///
     /// ```
-    /// use clamav::{ScanResult};
+    /// use clamav::{ScanResult, ScanSettings};
     ///
     /// clamav::initialize().expect("failed to initialize");
     /// let engine = clamav::Engine::new();
     /// engine.load_databases("test_data/database/").expect("failed to load");
     /// engine.compile().expect("failed to compile");
     ///
-    /// let hit = engine.scan_file("test_data/files/good_file").expect("expected scan to succeed");
+    /// let settings: ScanSettings = Default::default();
+    /// let hit = engine.scan_file("test_data/files/good_file", &settings).expect("expected scan to succeed");
+    ///
+    /// match hit {
+    ///     ScanResult::Virus(count, name) => println!("Virus {}, checked {} sigs", count, name),
+    ///     ScanResult::Clean(count) => println!("Clean checked {} sigs", count),
+    ///     ScanResult::Whitelisted(count) => println!("Whitelisted file w/{} sigs", count)
+    /// }
+    /// ```
+    ///
+    /// ```
+    /// use clamav::{ScanResult, ScanSettingsBuilder};
+    ///
+    /// clamav::initialize().expect("failed to initialize");
+    /// let engine = clamav::Engine::new();
+    /// engine.load_databases("test_data/database/").expect("failed to load");
+    /// engine.compile().expect("failed to compile");
+    ///
+    /// let settings = ScanSettingsBuilder::new()
+    ///     .enable_pdf()
+    ///     .block_broken_executables()
+    ///     .build();
+    /// println!("Using settings {}", settings);
+    /// let hit = engine.scan_file("test_data/files/good_file", &settings).expect("expected scan to succeed");
     ///
     /// match hit {
     ///     ScanResult::Virus(count, name) => println!("Virus {}, checked {} sigs", count, name),
@@ -196,7 +223,11 @@ impl Engine {
     /// The [`ClamError`] returned will contain the error code.
     ///
     /// [`ClamError`]: struct.ClamError.html
-    pub fn scan_file(&self, path: &str) -> Result<ScanResult, ClamError> {
+    pub fn scan_file(
+        &self,
+        path: &str,
+        settings: &scan_settings::ScanSettings,
+    ) -> Result<ScanResult, ClamError> {
         let raw_path = CString::new(path).unwrap();
         unsafe {
             let mut virname: *const i8 = ptr::null();
@@ -206,7 +237,7 @@ impl Engine {
                 &mut virname,
                 &mut scanned,
                 self.handle,
-                ffi::CL_SCAN_STDOPT,
+                settings.flags(),
             );
             match result {
                 ffi::cl_error::CL_CLEAN => Ok(ScanResult::Clean(scanned)),
@@ -306,7 +337,8 @@ mod tests {
             .load_databases(EXAMPLE_DATABASE_PATH)
             .expect("failed to load db");
         engine.compile().expect("failed to compile");
-        let result = engine.scan_file(NAUGHTY_FILE_PATH);
+        let settings: scan_settings::ScanSettings = Default::default();
+        let result = engine.scan_file(NAUGHTY_FILE_PATH, &settings);
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
@@ -324,7 +356,8 @@ mod tests {
             .load_databases(EXAMPLE_DATABASE_PATH)
             .expect("failed to load db");
         engine.compile().expect("failed to compile");
-        let result = engine.scan_file(GOOD_FILE_PATH);
+        let settings: scan_settings::ScanSettings = Default::default();
+        let result = engine.scan_file(GOOD_FILE_PATH, &settings);
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
