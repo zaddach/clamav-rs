@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::fmt;
 
 use ffi;
@@ -6,9 +8,19 @@ pub struct ScanSettings {
     settings: u32,
 }
 
+impl ScanSettings {
+    pub fn flags(&self) -> u32 {
+        self.settings
+    }
+}
+
 impl Default for ScanSettings {
     /// Returns the defualt scan settings per libclamav recommendations
-    fn default() -> ScanSettings { ScanSettings { settings: ffi::CL_SCAN_STDOPT } }
+    fn default() -> ScanSettings {
+        ScanSettings {
+            settings: ffi::CL_SCAN_STDOPT,
+        }
+    }
 }
 
 impl fmt::Display for ScanSettings {
