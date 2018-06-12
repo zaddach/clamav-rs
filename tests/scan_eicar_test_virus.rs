@@ -3,7 +3,8 @@ extern crate tempfile;
 
 use std::io::Write;
 
-use clamav::{default_database_directory, initialize, Engine, ScanResult, ScanSettingsBuilder};
+use clamav::scan_settings::ScanSettingsBuilder;
+use clamav::{db, engine};
 use tempfile::NamedTempFile;
 
 mod common;
@@ -20,18 +21,18 @@ fn scan_using_system_databases() {
 
     let scan_settings = ScanSettingsBuilder::new().build();
 
-    initialize().expect("initialize failed");
-    let engine = Engine::new();
-    engine
-        .load_databases(&default_database_directory())
+    clamav::initialize().expect("initialize failed");
+    let scanner = engine::Engine::new();
+    scanner
+        .load_databases(&db::default_directory())
         .expect("load failed");
-    engine.compile().expect("compile failed");
+    scanner.compile().expect("compile failed");
 
-    let result = engine
+    let result = scanner
         .scan_file(test_file.path().to_str().unwrap(), &scan_settings)
         .unwrap();
     match result {
-        ScanResult::Virus(name) => assert_eq!(name, "Eicar-Test-Signature"),
+        engine::ScanResult::Virus(name) => assert_eq!(name, "Eicar-Test-Signature"),
         _ => panic!("Expected test virust to be picked up as a virus"),
     }
 }
