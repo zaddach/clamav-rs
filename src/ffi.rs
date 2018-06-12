@@ -37,7 +37,7 @@ extern "C" {
 }
 
 #[repr(C)]
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
 pub enum cl_error {
     /* libclamav specific */
     /* CL_CLEAN = 0, */
