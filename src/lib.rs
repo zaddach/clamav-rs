@@ -24,11 +24,11 @@ pub fn initialize() -> Result<(), ClamError> {
         ONCE.call_once(|| {
             let result = ffi::cl_init(ffi::CL_INIT_DEFAULT);
             // copy so it's safe to use outside this fn
-            RESULT = result.clone();
+            RESULT = result;
         });
         match RESULT {
             ffi::cl_error::CL_SUCCESS => Ok(()),
-            _ => Err(ClamError::new(RESULT.clone())),
+            _ => Err(ClamError::new(RESULT)),
         }
     }
 }
