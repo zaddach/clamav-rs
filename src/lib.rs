@@ -23,10 +23,20 @@ pub fn initialize() -> Result<(), ClamError> {
     static mut RESULT: ffi::cl_error = ffi::cl_error::CL_SUCCESS;
     unsafe {
         ONCE.call_once(|| {
-            let result = ffi::cl_init(ffi::CL_INIT_DEFAULT);
-            // copy so it's safe to use outside this fn
-            RESULT = result;
+            RESULT = ffi::cl_init(ffi::CL_INIT_DEFAULT);
+            // this function always returns OK
+            if RESULT == ffi::cl_error::CL_SUCCESS {
+                ffi::cl_initialize_crypto();
+                libc::atexit(cleanup);
+            }
         });
+
+        extern "C" fn cleanup() {
+            unsafe {
+                ffi::cl_cleanup_crypto();
+            }
+        }
+
         match RESULT {
             ffi::cl_error::CL_SUCCESS => Ok(()),
             _ => Err(ClamError::new(RESULT)),

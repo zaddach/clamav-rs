@@ -10,6 +10,8 @@ pub type cl_engine = c_void;
 #[link(name = ":libclamav.so.7")]
 extern "C" {
     pub fn cl_init(initOptions: c_uint) -> cl_error;
+    pub fn cl_initialize_crypto() -> c_int;
+    pub fn cl_cleanup_crypto();
     pub fn cl_strerror(clerror: c_int) -> *const c_char;
 
     // engine
