@@ -44,11 +44,11 @@ impl Engine {
     /// # Examples
     ///
     /// ```
-    /// use clamav;
+    /// use clamav::{engine};
     ///
     /// clamav::initialize().expect("failed to initialize");
-    /// let engine = clamav::Engine::new();
-    /// engine.compile().expect("failed to compile");
+    /// let scanner = engine::Engine::new();
+    /// scanner.compile().expect("failed to compile");
     /// ```
     ///
     /// # Errors
@@ -74,12 +74,12 @@ impl Engine {
     /// # Examples
     ///
     /// ```
-    /// use clamav;
+    /// use clamav::{engine};
     ///
     /// clamav::initialize().expect("failed to initialize");
-    /// let engine = clamav::Engine::new();
-    /// engine.load_databases("test_data/database/").expect("failed to load");
-    /// engine.compile().expect("failed to compile");
+    /// let scanner = engine::Engine::new();
+    /// scanner.load_databases("test_data/database/").expect("failed to load");
+    /// scanner.compile().expect("failed to compile");
     /// ```
     ///
     /// # Errors
@@ -117,15 +117,15 @@ impl Engine {
     /// # Examples
     ///
     /// ```
-    /// use clamav::{ScanResult, ScanSettings};
+    /// use clamav::{engine, engine::ScanResult, scan_settings::ScanSettings};
     ///
     /// clamav::initialize().expect("failed to initialize");
-    /// let engine = clamav::Engine::new();
-    /// engine.load_databases("test_data/database/").expect("failed to load");
-    /// engine.compile().expect("failed to compile");
+    /// let scanner = engine::Engine::new();
+    /// scanner.load_databases("test_data/database/").expect("failed to load");
+    /// scanner.compile().expect("failed to compile");
     ///
     /// let settings: ScanSettings = Default::default();
-    /// let hit = engine.scan_file("test_data/files/good_file", &settings).expect("expected scan to succeed");
+    /// let hit = scanner.scan_file("test_data/files/good_file", &settings).expect("expected scan to succeed");
     ///
     /// match hit {
     ///     ScanResult::Virus(name) => println!("Virus {}", name),
@@ -135,19 +135,19 @@ impl Engine {
     /// ```
     ///
     /// ```
-    /// use clamav::{ScanResult, ScanSettingsBuilder};
+    /// use clamav::{engine, engine::ScanResult, scan_settings::ScanSettingsBuilder};
     ///
     /// clamav::initialize().expect("failed to initialize");
-    /// let engine = clamav::Engine::new();
-    /// engine.load_databases("test_data/database/").expect("failed to load");
-    /// engine.compile().expect("failed to compile");
+    /// let scanner = engine::Engine::new();
+    /// scanner.load_databases("test_data/database/").expect("failed to load");
+    /// scanner.compile().expect("failed to compile");
     ///
     /// let settings = ScanSettingsBuilder::new()
     ///     .enable_pdf()
     ///     .block_broken_executables()
     ///     .build();
     /// println!("Using settings {}", settings);
-    /// let hit = engine.scan_file("test_data/files/good_file", &settings).expect("expected scan to succeed");
+    /// let hit = scanner.scan_file("test_data/files/good_file", &settings).expect("expected scan to succeed");
     ///
     /// match hit {
     ///     ScanResult::Virus(name) => println!("Virus {}", name),
@@ -207,15 +207,15 @@ mod tests {
     #[test]
     fn compile_empty_engine_success() {
         ::initialize().expect("initialize should succeed");
-        let engine = Engine::new();
-        assert!(engine.compile().is_ok(), "compile should succeed");
+        let scanner = Engine::new();
+        assert!(scanner.compile().is_ok(), "compile should succeed");
     }
 
     #[test]
     fn load_databases_success() {
         ::initialize().expect("initialize should succeed");
-        let engine = Engine::new();
-        let result = engine.load_databases(TEST_DATABASES_PATH);
+        let scanner = Engine::new();
+        let result = scanner.load_databases(TEST_DATABASES_PATH);
         assert!(result.is_ok(), "load should succeed");
         assert!(
             result.unwrap().signature_count > 0,
@@ -226,8 +226,8 @@ mod tests {
     #[test]
     fn load_databases_with_file_success() {
         ::initialize().expect("initialize should succeed");
-        let engine = Engine::new();
-        let result = engine.load_databases(EXAMPLE_DATABASE_PATH);
+        let scanner = Engine::new();
+        let result = scanner.load_databases(EXAMPLE_DATABASE_PATH);
         assert!(result.is_ok(), "load should succeed");
         assert!(
             result.unwrap().signature_count > 0,
@@ -238,9 +238,9 @@ mod tests {
     #[test]
     fn load_databases_fake_path_fails() {
         ::initialize().expect("initialize should succeed");
-        let engine = Engine::new();
+        let scanner = Engine::new();
         assert!(
-            engine.load_databases("/dev/null").is_err(),
+            scanner.load_databases("/dev/null").is_err(),
             "should fail to load invalid databases"
         );
     }
@@ -248,13 +248,13 @@ mod tests {
     #[test]
     fn scan_naughty_file_matches() {
         ::initialize().expect("initialize should succeed");
-        let engine = Engine::new();
-        engine
+        let scanner = Engine::new();
+        scanner
             .load_databases(EXAMPLE_DATABASE_PATH)
             .expect("failed to load db");
-        engine.compile().expect("failed to compile");
+        scanner.compile().expect("failed to compile");
         let settings: ScanSettings = Default::default();
-        let result = engine.scan_file(NAUGHTY_FILE_PATH, &settings);
+        let result = scanner.scan_file(NAUGHTY_FILE_PATH, &settings);
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
@@ -268,13 +268,13 @@ mod tests {
     #[test]
     fn scan_good_file_success() {
         ::initialize().expect("initialize should succeed");
-        let engine = Engine::new();
-        engine
+        let scanner = Engine::new();
+        scanner
             .load_databases(EXAMPLE_DATABASE_PATH)
             .expect("failed to load db");
-        engine.compile().expect("failed to compile");
+        scanner.compile().expect("failed to compile");
         let settings: ScanSettings = Default::default();
-        let result = engine.scan_file(GOOD_FILE_PATH, &settings);
+        let result = scanner.scan_file(GOOD_FILE_PATH, &settings);
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
