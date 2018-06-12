@@ -13,7 +13,7 @@ exclude = [
 ]
 
 [dependencies]
-libc = "~0.2.42"
+libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
