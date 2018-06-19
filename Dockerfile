@@ -23,4 +23,4 @@ WORKDIR /usr/local/src/rust-clamav
 COPY src src
 COPY test_data test_data
 COPY tests tests
-COPY Cargo.lock Cargo.toml ./
+COPY Cargo.toml ./
