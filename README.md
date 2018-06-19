@@ -1,12 +1,7 @@
 # rust-clamav
+[![Build status](https://badge.buildkite.com/a0da848f88331d8f89467e9a22290760cbf0e16436687f0d9e.svg?branch=master)](https://buildkite.com/icebergdefender/rust-clamav)
 
-Bindings for [libclamav](https://www.clamav.net/) in Rust.
-
-[![Build Status](https://travis-ci.org/icebergdefender/rust-clamav.svg?branch=master)](https://travis-ci.org/icebergdefender/rust-clamav)
-
-# Overview
-
-rust-clamav is a safe library for interacting with libclamav from Rust.
+rust-clamav is a safe library for interacting with [libclamav](https://www.clamav.net) from Rust.
 The low-level C API is wrapped in idomatic and safe Rust code.
 
 # Documentation
@@ -17,13 +12,24 @@ The low-level C API is wrapped in idomatic and safe Rust code.
 
 # Requirements
 
-## Rust
+rust-clamav can be tested locally or via Docker.
+
+## Docker
+
+```
+docker build -t rust-clamav . 
+docker run -it rust-clamav cargo test
+```
+
+## Locally
+
+### Rust
 
 We currently target the latest stable release of Rust (1.26), and Cargo (1.26).
 
 [clippy](https://github.com/rust-lang-nursery/rust-clippy) is used for linting, install with: `cargo +nightly install clippy`
 
-## Linux
+### Linux
 `libclamav.so.7` should be available on the `PATH` at runtime (or `LD_LIBRARY_PATH` if it lives somewhere non-standard).
 
 Debian/Ubuntu minimal example:
@@ -35,3 +41,7 @@ Debian/Ubuntu minimal example:
 Freshclam can optionally be installed to keep the defintions in `/var/lib/clamav` up to date:
 
 `$ sudo apt install clamav-freshclam`
+
+# Thanks
+
+CI/CD charitably provided by [Buildkite.com](https://buildkite.com)
