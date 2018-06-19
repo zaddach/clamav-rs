@@ -21,6 +21,8 @@ The low-level C API is wrapped in idomatic and safe Rust code.
 
 We currently target the latest stable release of Rust (1.26), and Cargo (1.26).
 
+[clippy](https://github.com/rust-lang-nursery/rust-clippy) is used for linting, install with: `cargo +nightly install clippy`
+
 ## Linux
 `libclamav.so.7` should be available on the `PATH` at runtime (or `LD_LIBRARY_PATH` if it lives somewhere non-standard).
 
