@@ -1,0 +1,14 @@
+steps:
+  - name: ':docker: Build'
+    plugins:
+      docker-compose#v2.4.1:
+        build: app
+
+  - label: ':docker: Run'
+    commands:
+      - cargo +nightly clippy
+      - cargo build
+      - cargo test
+    plugins:
+      docker-compose#v2.4.1:
+        run: app
