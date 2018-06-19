@@ -7,19 +7,13 @@ steps:
   - wait
 
   - label: ':docker: Test Stable'
-    commands:
-      - cargo +nightly clippy
-      - cargo build
-      - cargo test
+    command: .buildkite/build.sh
     plugins:
       docker-compose#v2.4.1:
         run: app
 
   - label: ':docker: Test Nightly'
-    commands:
-      - cargo +nightly clippy
-      - cargo +nightly build
-      - cargo +nightly test
+    command: .buildkite/build-nightly.sh
     plugins:
       docker-compose#v2.4.1:
         run: app

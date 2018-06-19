@@ -20,6 +20,7 @@ RUN set -eux; \
 RUN rustup install nightly && cargo +nightly install clippy
 
 WORKDIR /usr/local/src/rust-clamav
+COPY .buildkite/build.sh .buildkite/build-nightly.sh .buildkite/
 COPY src src
 COPY test_data test_data
 COPY tests tests
