@@ -6,7 +6,6 @@ authors = ["Zachary Sims <zac@icebergdefender.com>"]
 homepage = "https://github.com/icebergdefender/rust-clamav"
 repository = "https://github.com/icebergdefender/rust-clamav"
 license = "MIT"
-license-file = "LICENSE"
 categories = ["external-ffi-bindings"]
 exclude = [
     "test_data/*"
