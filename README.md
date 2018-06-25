@@ -1,5 +1,6 @@
 # rust-clamav
 [![Build status](https://badge.buildkite.com/a0da848f88331d8f89467e9a22290760cbf0e16436687f0d9e.svg?branch=master)](https://buildkite.com/icebergdefender/rust-clamav)
+[![crates.io](https://img.shields.io/crates/v/clamav.svg)](https://crates.io/crates/clamav)
 
 rust-clamav is a safe library for interacting with [libclamav](https://www.clamav.net) from Rust.
 The low-level C API is wrapped in idomatic and safe Rust code.
