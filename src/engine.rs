@@ -27,6 +27,9 @@ pub struct Engine {
     handle: *mut ffi::cl_engine,
 }
 
+unsafe impl Send for Engine {}
+unsafe impl Sync for Engine {}
+
 impl Engine {
     /// Initialises the engine
     pub fn new() -> Self {
