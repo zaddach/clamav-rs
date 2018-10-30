@@ -30,6 +30,21 @@ pub struct Engine {
 unsafe impl Send for Engine {}
 unsafe impl Sync for Engine {}
 
+fn map_scan_result(result: ffi::cl_error, virname: *const i8) -> Result<ScanResult, ClamError> {
+    match result {
+        ffi::cl_error::CL_CLEAN => Ok(ScanResult::Clean),
+        ffi::cl_error::CL_BREAK => Ok(ScanResult::Whitelisted),
+        ffi::cl_error::CL_VIRUS => {
+            unsafe {
+                let bytes = CStr::from_ptr(virname).to_bytes();
+                let name = str::from_utf8(bytes).ok().unwrap_or_default().to_string();
+                Ok(ScanResult::Virus(name))
+            }
+        }
+        _ => Err(ClamError::new(result)),
+    }
+}
+
 impl Engine {
     /// Initialises the engine
     pub fn new() -> Self {
@@ -176,18 +191,28 @@ impl Engine {
                 self.handle,
                 settings.flags(),
             );
-            match result {
-                ffi::cl_error::CL_CLEAN => Ok(ScanResult::Clean),
-                ffi::cl_error::CL_BREAK => Ok(ScanResult::Whitelisted),
-                ffi::cl_error::CL_VIRUS => {
-                    let bytes = CStr::from_ptr(virname).to_bytes();
-                    let name = str::from_utf8(bytes).ok().unwrap_or_default().to_string();
-                    Ok(ScanResult::Virus(name))
-                }
-                _ => Err(ClamError::new(result)),
-            }
+            map_scan_result(result, virname)
         }
     }
+
+    /// Scans a descriptor with the previously loaded and compiled definitions.
+    ///
+    /// This function will scan the given descriptor with the the database definitions
+    /// loaded and compiled.
+    pub fn scan_descriptor(&self, descriptor: i32, settings: &ScanSettings) -> Result<ScanResult, ClamError> {
+        unsafe {
+            let mut virname: *const i8 = ptr::null();
+            let result = ffi::cl_scandesc(
+                descriptor,
+                &mut virname,
+                ptr::null_mut(),
+                self.handle,
+                settings.flags(),
+            );
+            map_scan_result(result, virname)
+        }
+    }
+
 }
 
 impl Drop for Engine {
@@ -201,6 +226,8 @@ impl Drop for Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use std::os::unix::io::AsRawFd;
 
     const TEST_DATABASES_PATH: &'static str = "test_data/database/";
     const EXAMPLE_DATABASE_PATH: &'static str = "test_data/database/example.cud";
@@ -278,6 +305,46 @@ mod tests {
         scanner.compile().expect("failed to compile");
         let settings: ScanSettings = Default::default();
         let result = scanner.scan_file(GOOD_FILE_PATH, &settings);
+        assert!(result.is_ok(), "scan should succeed");
+        let hit = result.unwrap();
+        match hit {
+            ScanResult::Clean => {}
+            _ => panic!("should have matched as a virus"),
+        }
+    }
+
+    #[test]
+    fn scan_naughty_fd_matches() {
+        ::initialize().expect("initialize should succeed");
+        let scanner = Engine::new();
+        scanner
+            .load_databases(EXAMPLE_DATABASE_PATH)
+            .expect("failed to load db");
+        scanner.compile().expect("failed to compile");
+        let settings: ScanSettings = Default::default();
+        let file = File::open(NAUGHTY_FILE_PATH).unwrap();
+        let result = scanner.scan_descriptor(file.as_raw_fd(), &settings);
+        assert!(result.is_ok(), "scan should succeed");
+        let hit = result.unwrap();
+        match hit {
+            ScanResult::Virus(name) => {
+                assert_eq!(name, "naughty_file.UNOFFICIAL");
+            }
+            _ => panic!("should have matched as a virus"),
+        }
+    }
+
+    #[test]
+    fn scan_good_fd_success() {
+        ::initialize().expect("initialize should succeed");
+        let scanner = Engine::new();
+        scanner
+            .load_databases(EXAMPLE_DATABASE_PATH)
+            .expect("failed to load db");
+        scanner.compile().expect("failed to compile");
+        let settings: ScanSettings = Default::default();
+        let file = File::open(GOOD_FILE_PATH).unwrap();
+        let result = scanner.scan_descriptor(file.as_raw_fd(), &settings);
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {

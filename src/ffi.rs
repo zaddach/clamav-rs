@@ -37,6 +37,14 @@ extern "C" {
         scanoptions: c_uint,
     ) -> cl_error;
 
+    pub fn cl_scandesc(
+        desc: c_int,
+        virname: *mut *const c_char,
+        scanned: *mut c_ulong,
+        engine: *const cl_engine,
+        scanoptions: c_uint,
+    ) -> cl_error;
+
     // version
     pub fn cl_retflevel() -> c_uint;
     pub fn cl_retver() -> *const c_char;
