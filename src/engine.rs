@@ -2,10 +2,18 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ptr;
 use std::str;
+use std::os::raw::c_ulong;
 
-use error::ClamError;
-use ffi;
-use scan_settings::ScanSettings;
+use clamav_sys::{
+    cl_error_t,
+    cl_load,
+    CL_DB_STDOPT,
+};
+
+
+use crate::error::ClamError;
+use crate::scan_settings::ScanSettings;
+use crate::fmap::Fmap;
 
 /// Stats of a loaded database
 pub struct DatabaseStats {
@@ -24,17 +32,17 @@ pub enum ScanResult {
 
 /// Engine used for scanning files
 pub struct Engine {
-    handle: *mut ffi::cl_engine,
+    handle: *mut clamav_sys::cl_engine,
 }
 
 unsafe impl Send for Engine {}
 unsafe impl Sync for Engine {}
 
-fn map_scan_result(result: ffi::cl_error, virname: *const i8) -> Result<ScanResult, ClamError> {
+fn map_scan_result(result: cl_error_t, virname: *const i8) -> Result<ScanResult, ClamError> {
     match result {
-        ffi::cl_error::CL_CLEAN => Ok(ScanResult::Clean),
-        ffi::cl_error::CL_BREAK => Ok(ScanResult::Whitelisted),
-        ffi::cl_error::CL_VIRUS => {
+        cl_error_t::CL_CLEAN => Ok(ScanResult::Clean),
+        cl_error_t::CL_BREAK => Ok(ScanResult::Whitelisted),
+        cl_error_t::CL_VIRUS => {
             unsafe {
                 let bytes = CStr::from_ptr(virname).to_bytes();
                 let name = str::from_utf8(bytes).ok().unwrap_or_default().to_string();
@@ -49,7 +57,7 @@ impl Engine {
     /// Initialises the engine
     pub fn new() -> Self {
         unsafe {
-            let handle = ffi::cl_engine_new();
+            let handle = clamav_sys::cl_engine_new();
             Engine { handle }
         }
     }
@@ -77,9 +85,9 @@ impl Engine {
     /// [`ClamError`]: struct.ClamError.html
     pub fn compile(&self) -> Result<(), ClamError> {
         unsafe {
-            let result = ffi::cl_engine_compile(self.handle);
+            let result = clamav_sys::cl_engine_compile(self.handle);
             match result {
-                ffi::cl_error::CL_SUCCESS => Ok(()),
+                cl_error_t::CL_SUCCESS => Ok(()),
                 _ => Err(ClamError::new(result)),
             }
         }
@@ -114,14 +122,14 @@ impl Engine {
         let raw_path = CString::new(database_directory_path).unwrap();
         unsafe {
             let mut signature_count: u32 = 0;
-            let result = ffi::cl_load(
+            let result = cl_load(
                 raw_path.as_ptr(),
                 self.handle,
                 &mut signature_count,
-                ffi::CL_DB_STDOPT,
+                CL_DB_STDOPT,
             );
             match result {
-                ffi::cl_error::CL_SUCCESS => Ok(DatabaseStats { signature_count }),
+                cl_error_t::CL_SUCCESS => Ok(DatabaseStats { signature_count }),
                 _ => Err(ClamError::new(result)),
             }
         }
@@ -180,16 +188,16 @@ impl Engine {
     /// The [`ClamError`] returned will contain the error code.
     ///
     /// [`ClamError`]: struct.ClamError.html
-    pub fn scan_file(&self, path: &str, settings: &ScanSettings) -> Result<ScanResult, ClamError> {
+    pub fn scan_file(&self, path: &str, settings: &mut ScanSettings) -> Result<ScanResult, ClamError> {
         let raw_path = CString::new(path).unwrap();
         unsafe {
             let mut virname: *const i8 = ptr::null();
-            let result = ffi::cl_scanfile(
+            let result = clamav_sys::cl_scanfile(
                 raw_path.as_ptr(),
                 &mut virname,
                 ptr::null_mut(),
                 self.handle,
-                settings.flags(),
+                &mut settings.settings,
             );
             map_scan_result(result, virname)
         }
@@ -199,26 +207,62 @@ impl Engine {
     ///
     /// This function will scan the given descriptor with the the database definitions
     /// loaded and compiled.
-    pub fn scan_descriptor(&self, descriptor: i32, settings: &ScanSettings) -> Result<ScanResult, ClamError> {
+    pub fn scan_descriptor(&self, descriptor: i32, settings: &mut ScanSettings, filename: Option< &str >) -> Result<ScanResult, ClamError> {
         unsafe {
             let mut virname: *const i8 = ptr::null();
-            let result = ffi::cl_scandesc(
+            let filename_cstr = filename.map(|x| CString::new(x).expect("CString::new failed"));
+            let mut scanned : c_ulong = 0;
+            let result = clamav_sys::cl_scandesc(
                 descriptor,
+                filename_cstr.map_or(ptr::null(), |x| x.as_ptr()),
                 &mut virname,
-                ptr::null_mut(),
+                &mut scanned,
                 self.handle,
-                settings.flags(),
+                &mut settings.settings,
             );
             map_scan_result(result, virname)
         }
     }
 
+    #[cfg(unix)]
+    pub fn scan_fileobj(&self, file: &std::fs::File, settings: &mut ScanSettings) -> Result<ScanResult, ClamError> {
+        use std::os::unix::io::AsRawFd;
+        self.scan_descriptor(file.as_raw_fd(), settings)
+    }
+
+    #[cfg(windows)]
+    pub fn scan_fileobj(&self, file: &std::fs::File, settings: &mut ScanSettings, filename: Option< &str >) -> Result<ScanResult, ClamError> {
+        use std::os::windows::io::AsRawHandle;
+        self.scan_descriptor(file.as_raw_handle() as i32, settings, filename)
+    }
+
+    /// @brief Scan custom data.
+    /// @param map           Buffer to be scanned, in form of a cl_fmap_t.
+    /// @param filename      Name of data origin. Does not need to be an actual
+    ///                      file on disk. May be None if a name is not available.
+    /// @param engine        The scanning engine.
+    /// @param scanoptions   The scanning options.
+    pub fn scan_map(&self, map : &dyn Fmap, filename: Option<&str>, settings: &mut ScanSettings) -> Result<ScanResult, ClamError> {
+        let mut virname: *const i8 = ptr::null();
+        let c_filename = filename.map(|n| CString::new(n).expect("CString::new failed"));
+        let result = unsafe {
+            clamav_sys::cl_scanmap_callback(
+                map.get_map(),
+                c_filename.map_or(ptr::null(), |n| n.as_ptr()),
+                &mut virname,
+                ptr::null_mut(),
+                self.handle,
+                &mut settings.settings,
+                ptr::null_mut())
+        };
+        map_scan_result(result, virname)
+    }
 }
 
 impl Drop for Engine {
     fn drop(&mut self) {
         unsafe {
-            ffi::cl_engine_free(self.handle);
+            clamav_sys::cl_engine_free(self.handle);
         }
     }
 }
@@ -227,7 +271,6 @@ impl Drop for Engine {
 mod tests {
     use super::*;
     use std::fs::File;
-    use std::os::unix::io::AsRawFd;
 
     const TEST_DATABASES_PATH: &'static str = "test_data/database/";
     const EXAMPLE_DATABASE_PATH: &'static str = "test_data/database/example.cud";
@@ -236,14 +279,14 @@ mod tests {
 
     #[test]
     fn compile_empty_engine_success() {
-        ::initialize().expect("initialize should succeed");
+        crate::initialize().expect("initialize should succeed");
         let scanner = Engine::new();
         assert!(scanner.compile().is_ok(), "compile should succeed");
     }
 
     #[test]
     fn load_databases_success() {
-        ::initialize().expect("initialize should succeed");
+        crate::initialize().expect("initialize should succeed");
         let scanner = Engine::new();
         let result = scanner.load_databases(TEST_DATABASES_PATH);
         assert!(result.is_ok(), "load should succeed");
@@ -255,7 +298,7 @@ mod tests {
 
     #[test]
     fn load_databases_with_file_success() {
-        ::initialize().expect("initialize should succeed");
+        crate::initialize().expect("initialize should succeed");
         let scanner = Engine::new();
         let result = scanner.load_databases(EXAMPLE_DATABASE_PATH);
         assert!(result.is_ok(), "load should succeed");
@@ -267,7 +310,7 @@ mod tests {
 
     #[test]
     fn load_databases_fake_path_fails() {
-        ::initialize().expect("initialize should succeed");
+        crate::initialize().expect("initialize should succeed");
         let scanner = Engine::new();
         assert!(
             scanner.load_databases("/dev/null").is_err(),
@@ -277,14 +320,14 @@ mod tests {
 
     #[test]
     fn scan_naughty_file_matches() {
-        ::initialize().expect("initialize should succeed");
+        crate::initialize().expect("initialize should succeed");
         let scanner = Engine::new();
         scanner
             .load_databases(EXAMPLE_DATABASE_PATH)
             .expect("failed to load db");
         scanner.compile().expect("failed to compile");
-        let settings: ScanSettings = Default::default();
-        let result = scanner.scan_file(NAUGHTY_FILE_PATH, &settings);
+        let mut settings: ScanSettings = Default::default();
+        let result = scanner.scan_file(NAUGHTY_FILE_PATH, &mut settings);
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
@@ -297,14 +340,14 @@ mod tests {
 
     #[test]
     fn scan_good_file_success() {
-        ::initialize().expect("initialize should succeed");
+        crate::initialize().expect("initialize should succeed");
         let scanner = Engine::new();
         scanner
             .load_databases(EXAMPLE_DATABASE_PATH)
             .expect("failed to load db");
         scanner.compile().expect("failed to compile");
-        let settings: ScanSettings = Default::default();
-        let result = scanner.scan_file(GOOD_FILE_PATH, &settings);
+        let mut settings: ScanSettings = Default::default();
+        let result = scanner.scan_file(GOOD_FILE_PATH, &mut settings);
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
@@ -314,8 +357,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn scan_naughty_fd_matches() {
-        ::initialize().expect("initialize should succeed");
+        crate::initialize().expect("initialize should succeed");
         let scanner = Engine::new();
         scanner
             .load_databases(EXAMPLE_DATABASE_PATH)
@@ -323,7 +367,7 @@ mod tests {
         scanner.compile().expect("failed to compile");
         let settings: ScanSettings = Default::default();
         let file = File::open(NAUGHTY_FILE_PATH).unwrap();
-        let result = scanner.scan_descriptor(file.as_raw_fd(), &settings);
+        let result = scanner.scan_fileobj(&file, &settings);
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
@@ -336,15 +380,15 @@ mod tests {
 
     #[test]
     fn scan_good_fd_success() {
-        ::initialize().expect("initialize should succeed");
+        crate::initialize().expect("initialize should succeed");
         let scanner = Engine::new();
         scanner
             .load_databases(EXAMPLE_DATABASE_PATH)
             .expect("failed to load db");
         scanner.compile().expect("failed to compile");
-        let settings: ScanSettings = Default::default();
+        let mut settings: ScanSettings = Default::default();
         let file = File::open(GOOD_FILE_PATH).unwrap();
-        let result = scanner.scan_descriptor(file.as_raw_fd(), &settings);
+        let result = scanner.scan_fileobj(&file, &mut settings, Some(GOOD_FILE_PATH));
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {

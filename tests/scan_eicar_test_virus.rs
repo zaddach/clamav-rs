@@ -1,10 +1,7 @@
-extern crate clamav;
-extern crate tempfile;
-
 use std::io::Write;
 
-use clamav::scan_settings::ScanSettingsBuilder;
-use clamav::{db, engine};
+use clamav_rs::scan_settings::ScanSettingsBuilder;
+use clamav_rs::{db, engine};
 use tempfile::NamedTempFile;
 
 mod common;
@@ -19,9 +16,9 @@ fn scan_using_system_databases() {
     write!(test_file, r"-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*").unwrap();
     test_file.flush().unwrap();
 
-    let scan_settings = ScanSettingsBuilder::new().build();
+    let mut scan_settings = ScanSettingsBuilder::new().build();
 
-    clamav::initialize().expect("initialize failed");
+    clamav_rs::initialize().expect("initialize failed");
     let scanner = engine::Engine::new();
     scanner
         .load_databases(&db::default_directory())
@@ -29,7 +26,7 @@ fn scan_using_system_databases() {
     scanner.compile().expect("compile failed");
 
     let result = scanner
-        .scan_file(test_file.path().to_str().unwrap(), &scan_settings)
+        .scan_file(test_file.path().to_str().unwrap(), &mut scan_settings)
         .unwrap();
     match result {
         engine::ScanResult::Virus(name) => assert_eq!(name, "Eicar-Test-Signature"),

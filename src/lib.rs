@@ -1,41 +1,45 @@
-extern crate libc;
-
-use std::sync::{Once, ONCE_INIT};
+use std::sync::Once;
 
 pub mod db;
 pub mod engine;
 mod error;
-mod ffi;
 pub mod scan_settings;
 pub mod version;
+pub mod fmap;
 
 pub use error::ClamError;
+
+use clamav_sys::{
+    cl_error_t,
+    cl_init,
+    cl_initialize_crypto,
+};
 
 /// Initializes clamav
 ///
 /// This must be called once per process. This is safe to call multiple times.
 pub fn initialize() -> Result<(), ClamError> {
     // the cl_init implementation isn't thread-safe, which is painful for tests
-    static ONCE: Once = ONCE_INIT;
-    static mut RESULT: ffi::cl_error = ffi::cl_error::CL_SUCCESS;
+    static ONCE: Once = Once::new();
+    static mut RESULT: cl_error_t = cl_error_t::CL_SUCCESS;
     unsafe {
         ONCE.call_once(|| {
-            RESULT = ffi::cl_init(ffi::CL_INIT_DEFAULT);
+            RESULT = cl_init(clamav_sys::CL_INIT_DEFAULT);
             // this function always returns OK
-            if RESULT == ffi::cl_error::CL_SUCCESS {
-                ffi::cl_initialize_crypto();
+            if RESULT == cl_error_t::CL_SUCCESS {
+                cl_initialize_crypto();
                 libc::atexit(cleanup);
             }
         });
 
         extern "C" fn cleanup() {
             unsafe {
-                ffi::cl_cleanup_crypto();
+                clamav_sys::cl_cleanup_crypto();
             }
         }
 
         match RESULT {
-            ffi::cl_error::CL_SUCCESS => Ok(()),
+            cl_error_t::CL_SUCCESS => Ok(()),
             _ => Err(ClamError::new(RESULT)),
         }
     }

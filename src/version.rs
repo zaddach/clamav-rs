@@ -1,11 +1,9 @@
 use std::ffi::CStr;
 use std::str;
 
-use ffi;
-
 /// Returns the database version level that the engine supports
 pub fn flevel() -> u32 {
-    unsafe { ffi::cl_retflevel() }
+    unsafe { clamav_sys::cl_retflevel() }
 }
 
 /// Gets the clamav engine version
@@ -19,7 +17,7 @@ pub fn flevel() -> u32 {
 /// ```
 pub fn version() -> String {
     unsafe {
-        let ptr = ffi::cl_retver();
+        let ptr = clamav_sys::cl_retver();
         let bytes = CStr::from_ptr(ptr).to_bytes();
         str::from_utf8(bytes)
             .ok()
@@ -34,13 +32,13 @@ mod tests {
 
     #[test]
     fn version_success() {
-        ::initialize().expect("initialize should succeed");
+        crate::initialize().expect("initialize should succeed");
         assert!(version().len() > 0, "expected a version");
     }
 
     #[test]
     fn flevel_success() {
-        ::initialize().expect("initialize should succeed");
+        crate::initialize().expect("initialize should succeed");
         assert!(flevel() > 0, "expected an flevel");
     }
 }
