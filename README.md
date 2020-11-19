@@ -41,7 +41,3 @@ Debian/Ubuntu minimal example:
 Freshclam can optionally be installed to keep the defintions in `/var/lib/clamav` up to date:
 
 `$ sudo apt install clamav-freshclam`
-
-# Thanks
-
-CI/CD charitably provided by [Buildkite.com](https://buildkite.com)
