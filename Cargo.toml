@@ -1,7 +1,7 @@
 [package]
 name = "clamav-rs"
 description = "clamav bindings for Rust"
-version = "0.5.0"
+version = "0.5.2"
 authors = ["Jonas Zaddach <jonas.zaddach@gmail.com", "Zachary Sims <zac@icebergdefender.com>"]
 homepage = "https://github.com/zaddach/clamav-rs"
 repository = "https://github.com/zaddach/clamav-rs"
@@ -13,7 +13,7 @@ exclude = [
 ]
 
 [dependencies]
-clamav-sys = "0.0.1"
+clamav-sys = "0.0.2"
 bitflags = "1.2.1"
 libc = "0.2"
 
