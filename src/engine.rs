@@ -225,9 +225,9 @@ impl Engine {
     }
 
     #[cfg(unix)]
-    pub fn scan_fileobj(&self, file: &std::fs::File, settings: &mut ScanSettings) -> Result<ScanResult, ClamError> {
+    pub fn scan_fileobj(&self, file: &std::fs::File, settings: &mut ScanSettings, filename: Option< &str >) -> Result<ScanResult, ClamError> {
         use std::os::unix::io::AsRawFd;
-        self.scan_descriptor(file.as_raw_fd(), settings)
+        self.scan_descriptor(file.as_raw_fd(), settings, filename)
     }
 
     #[cfg(windows)]
