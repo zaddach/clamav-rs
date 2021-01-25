@@ -45,6 +45,18 @@ pub fn initialize() -> Result<(), ClamError> {
     }
 }
 
+pub fn version() -> String {
+    let ver = unsafe {clamav_sys::cl_retver()};
+    if ver == std::ptr::null() {
+        "".to_string()
+    }
+    else {
+        unsafe {
+            std::ffi::CStr::from_ptr(ver).to_string_lossy().to_string()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
