@@ -14,6 +14,7 @@ use clamav_sys::{
 use crate::error::ClamError;
 use crate::scan_settings::ScanSettings;
 use crate::fmap::Fmap;
+use crate::windows_fd::WindowsFd;
 
 /// Stats of a loaded database
 pub struct DatabaseStats {
@@ -225,15 +226,15 @@ impl Engine {
     }
 
     #[cfg(unix)]
-    pub fn scan_fileobj(&self, file: &std::fs::File, settings: &mut ScanSettings, filename: Option< &str >) -> Result<ScanResult, ClamError> {
-        use std::os::unix::io::AsRawFd;
+    pub fn scan_fileobj<T: std::os::unix::io::AsRawFd>(&self, file: &T, settings: &mut ScanSettings, filename: Option< &str >) -> Result<ScanResult, ClamError>
+    {
         self.scan_descriptor(file.as_raw_fd(), settings, filename)
     }
 
     #[cfg(windows)]
-    pub fn scan_fileobj(&self, file: &std::fs::File, settings: &mut ScanSettings, filename: Option< &str >) -> Result<ScanResult, ClamError> {
-        use std::os::windows::io::AsRawHandle;
-        self.scan_descriptor(file.as_raw_handle() as i32, settings, filename)
+    pub fn scan_fileobj<T: std::os::windows::io::AsRawHandle>(&self, file: &T, settings: &mut ScanSettings, filename: Option< &str >) -> Result<ScanResult, ClamError> {
+        let fd = WindowsFd::new(file.as_raw_handle()).map_err(|_| ClamError::new(cl_error_t::CL_EARG))?; 
+        self.scan_descriptor(fd.raw(), settings, filename)
     }
 
     /// @brief Scan custom data.
@@ -242,12 +243,12 @@ impl Engine {
     ///                      file on disk. May be None if a name is not available.
     /// @param engine        The scanning engine.
     /// @param scanoptions   The scanning options.
-    pub fn scan_map(&self, map : &dyn Fmap, filename: Option<&str>, settings: &mut ScanSettings) -> Result<ScanResult, ClamError> {
+    pub fn scan_map(&self, map : & Fmap, filename: Option<&str>, settings: &mut ScanSettings) -> Result<ScanResult, ClamError> {
         let mut virname: *const i8 = ptr::null();
         let c_filename = filename.map(|n| CString::new(n).expect("CString::new failed"));
         let result = unsafe {
             clamav_sys::cl_scanmap_callback(
-                map.get_map(),
+                map.raw(),
                 c_filename.map_or(ptr::null(), |n| n.as_ptr()),
                 &mut virname,
                 ptr::null_mut(),

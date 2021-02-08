@@ -6,6 +6,8 @@ mod error;
 pub mod scan_settings;
 pub mod version;
 pub mod fmap;
+#[cfg(windows)]
+pub mod windows_fd;
 
 pub use error::ClamError;
 

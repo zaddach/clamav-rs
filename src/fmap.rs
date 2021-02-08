@@ -14,18 +14,37 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 // MA 02110-1301, USA.
+//
 
-use std::ffi::{
-    c_void,
-};
 use std::fmt;
 use std::result;
+use std::os;
+use std::mem;
+
+use bindings::windows::win32::{
+    debug::{
+        GetLastError,
+    },
+    file_system::{
+        ReadFile,
+    },
+    system_services::{
+        ERROR_HANDLE_EOF,
+        OVERLAPPED,
+    },
+};
 
 use clamav_sys::{
     cl_fmap_t,
+    cl_fmap_open_handle,
     cl_fmap_open_memory,
     cl_fmap_close,
 };
+
+#[cfg(windows)]
+pub type RawOsHandle = std::os::windows::io::RawHandle;
+#[cfg(unix)]
+pub type RawOsHandle = std::os::unix::io::RawFd;
 
 #[derive(Debug, Clone)]
 pub struct MapError;
@@ -42,34 +61,60 @@ impl MapError {
 
 pub type Result<T> = result::Result<T, MapError>;
 
-pub trait Fmap {
-    fn get_map(&self) -> *mut cl_fmap_t;
+#[cfg(windows)]
+extern fn cl_pread(handle: *mut os::raw::c_void, buf: *mut os::raw::c_void, count: os::raw::c_ulonglong, offset: os::raw::c_long) -> os::raw::c_long {
+    let mut read_bytes = 0;
+
+    unsafe {
+        let mut overlapped: OVERLAPPED = mem::MaybeUninit::zeroed().assume_init();
+        overlapped.internal_high = (offset as usize) >> 32;
+        overlapped.internal = (offset as usize) & 0xffffffff;
+
+        if ReadFile(mem::transmute(handle), buf, count as u32, &mut read_bytes, &mut overlapped).is_err() {
+            let err = GetLastError();
+            if err != ERROR_HANDLE_EOF as u32 {
+                return -1;
+            }
+        }
+    }
+
+    read_bytes as i32
 }
 
+#[cfg(unix)]
+extern fn cl_pread(handle: *mut os::raw::c_void, buf: *mut os::raw::c_void, count: os::raw::c_ulonglong, offset: os::raw::c_long) -> os::raw::c_long {
+    libc::pread(handle, buf, count, offset)
+}
 
 #[allow(dead_code)]
-pub struct MemoryFmap {
-    map: *mut cl_fmap_t,
-}
+pub struct Fmap(*mut cl_fmap_t);
 
-impl MemoryFmap {
-    pub fn new(start: *const u8, len: u64) -> Result< MemoryFmap > {
-        let map = unsafe { cl_fmap_open_memory(start as *const c_void, len) };
+impl Fmap {
+    pub fn new_from_memory(start: *const u8, len: u64) -> Result< Fmap > {
+        let map = unsafe { cl_fmap_open_memory(start as *const os::raw::c_void, len) };
         if map.is_null() {
             Err(MapError::new())
         }
         else {
-            Ok(MemoryFmap {map})
+            Ok(Fmap(map))
         }
     }
-}
 
-impl Drop for MemoryFmap {
-    fn drop(&mut self) -> () {
-        unsafe {cl_fmap_close(self.map)};
+    pub fn new_from_handle(handle: RawOsHandle, offset: u64, len: u64, use_ageing: bool) -> Result< Fmap > {
+        let map = unsafe { cl_fmap_open_handle(handle as *mut os::raw::c_void, offset, len, Some(cl_pread), use_ageing.into() ) };
+        if map.is_null() {
+            Err(MapError::new())
+        }
+        else {
+            Ok(Fmap(map))
+        }
     }
+
+    pub fn raw(& self) -> *mut cl_fmap_t {self.0}
 }
 
-impl Fmap for MemoryFmap {
-    fn get_map(& self) -> *mut cl_fmap_t {self.map}
+impl Drop for Fmap {
+    fn drop(&mut self) -> () {
+        unsafe {cl_fmap_close(self.0)};
+    }
 }
