@@ -20,6 +20,7 @@ use std::fmt;
 use std::result;
 use std::os;
 use std::mem;
+use std::error;
 
 use bindings::windows::win32::{
     debug::{
@@ -52,6 +53,12 @@ pub struct MapError;
 impl fmt::Display for MapError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Failed to open mapping")
+    }
+}
+
+impl error::Error for MapError {
+    fn source(&self) -> Option<&(error::Error + 'static)> {
+        None
     }
 }
 

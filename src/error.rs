@@ -1,6 +1,7 @@
 use std::ffi::CStr;
 use std::fmt;
 use std::str;
+use std::error;
 
 use clamav_sys::cl_error_t;
 
@@ -42,6 +43,12 @@ impl fmt::Display for ClamError {
 impl fmt::Debug for ClamError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.to_string())
+    }
+}
+
+impl error::Error for ClamError {
+    fn source(&self) -> Option<&(error::Error + 'static)> {
+        None
     }
 }
 
