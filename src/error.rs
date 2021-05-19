@@ -47,7 +47,7 @@ impl fmt::Debug for ClamError {
 }
 
 impl error::Error for ClamError {
-    fn source(&self) -> Option<&(error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         None
     }
 }

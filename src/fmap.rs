@@ -19,9 +19,9 @@
 use std::fmt;
 use std::result;
 use std::os;
-use std::mem;
 use std::error;
 
+#[cfg(windows)]
 use bindings::windows::win32::{
     debug::{
         GetLastError,
@@ -57,7 +57,7 @@ impl fmt::Display for MapError {
 }
 
 impl error::Error for MapError {
-    fn source(&self) -> Option<&(error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         None
     }
 }
@@ -73,7 +73,7 @@ extern fn cl_pread(handle: *mut os::raw::c_void, buf: *mut os::raw::c_void, coun
     let mut read_bytes = 0;
 
     unsafe {
-        let mut overlapped: OVERLAPPED = mem::MaybeUninit::zeroed().assume_init();
+        let mut overlapped: OVERLAPPED = std::mem::MaybeUninit::zeroed().assume_init();
         overlapped.internal_high = (offset as usize) >> 32;
         overlapped.internal = (offset as usize) & 0xffffffff;
 
@@ -90,7 +90,10 @@ extern fn cl_pread(handle: *mut os::raw::c_void, buf: *mut os::raw::c_void, coun
 
 #[cfg(unix)]
 extern fn cl_pread(handle: *mut os::raw::c_void, buf: *mut os::raw::c_void, count: os::raw::c_ulonglong, offset: os::raw::c_long) -> os::raw::c_long {
-    libc::pread(handle, buf, count, offset)
+    use std::convert::TryInto;
+    unsafe {
+        libc::pread(handle as i32, buf, count.try_into().unwrap(), offset).try_into().unwrap()
+    }
 }
 
 #[allow(dead_code)]

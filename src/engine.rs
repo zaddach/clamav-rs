@@ -14,6 +14,7 @@ use clamav_sys::{
 use crate::error::ClamError;
 use crate::scan_settings::ScanSettings;
 use crate::fmap::Fmap;
+#[cfg(windows)]
 use crate::windows_fd::WindowsFd;
 
 /// Stats of a loaded database
