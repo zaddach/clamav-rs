@@ -77,7 +77,7 @@ extern fn cl_pread(handle: *mut os::raw::c_void, buf: *mut os::raw::c_void, coun
         overlapped.internal_high = (offset as usize) >> 32;
         overlapped.internal = (offset as usize) & 0xffffffff;
 
-        if ReadFile(mem::transmute(handle), buf, count as u32, &mut read_bytes, &mut overlapped).is_err() {
+        if ReadFile(std::mem::transmute(handle), buf, count as u32, &mut read_bytes, &mut overlapped).is_err() {
             let err = GetLastError();
             if err != ERROR_HANDLE_EOF as u32 {
                 return -1;
