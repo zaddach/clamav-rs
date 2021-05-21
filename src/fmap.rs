@@ -22,16 +22,13 @@ use std::os;
 use std::error;
 
 #[cfg(windows)]
-use bindings::windows::win32::{
-    debug::{
-        GetLastError,
-    },
-    file_system::{
-        ReadFile,
-    },
-    system_services::{
-        ERROR_HANDLE_EOF,
+use bindings::Windows::{
+    Win32::System::Diagnostics::Debug::GetLastError,
+    Win32::Storage::FileSystem::ReadFile,
+    Win32::System::Diagnostics::Debug::ERROR_HANDLE_EOF,
+    Win32::System::SystemServices::{
         OVERLAPPED,
+        HANDLE,
     },
 };
 
@@ -74,12 +71,12 @@ extern fn cl_pread(handle: *mut os::raw::c_void, buf: *mut os::raw::c_void, coun
 
     unsafe {
         let mut overlapped: OVERLAPPED = std::mem::MaybeUninit::zeroed().assume_init();
-        overlapped.internal_high = (offset as usize) >> 32;
-        overlapped.internal = (offset as usize) & 0xffffffff;
+        overlapped.InternalHigh = (offset as usize) >> 32;
+        overlapped.Internal = (offset as usize) & 0xffffffff;
 
-        if ReadFile(std::mem::transmute(handle), buf, count as u32, &mut read_bytes, &mut overlapped).is_err() {
+        if !ReadFile(std::mem::transmute::<_, HANDLE>(handle), buf, count as u32, &mut read_bytes, &mut overlapped).as_bool() {
             let err = GetLastError();
-            if err != ERROR_HANDLE_EOF as u32 {
+            if err != ERROR_HANDLE_EOF {
                 return -1;
             }
         }

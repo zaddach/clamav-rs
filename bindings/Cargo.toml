@@ -5,7 +5,7 @@ authors = ["Jonas Zaddach <jonas.zaddach@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-windows = "0.2.1"
+windows = "0.10.0"
 
 [build-dependencies]
-windows = "0.2.1"
+windows = "0.10.0"
