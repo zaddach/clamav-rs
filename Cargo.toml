@@ -1,7 +1,7 @@
 [package]
 name = "clamav-rs"
 description = "clamav bindings for Rust"
-version = "0.5.4"
+version = "0.5.5"
 authors = ["Jonas Zaddach <jonas.zaddach@gmail.com", "Zachary Sims <zac@icebergdefender.com>"]
 homepage = "https://github.com/zaddach/clamav-rs"
 repository = "https://github.com/zaddach/clamav-rs"
@@ -18,7 +18,7 @@ bitflags = "1.2.1"
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-clamav-rs-bindings = "0.0.1"
+clamav-rs-bindings = "0.5.5"
 
 [dev-dependencies]
 tempfile = "3"
