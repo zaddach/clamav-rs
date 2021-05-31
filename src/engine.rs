@@ -2,11 +2,19 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ptr;
 use std::str;
-use std::os::raw::c_ulong;
+use std::mem;
+use std::time;
+use std::os::raw::{c_ulong, c_int};
 
 use clamav_sys::{
+    cl_engine_field,
+    cl_engine_get_num,
+    cl_engine_get_str,
+    cl_engine_set_num,
+    cl_engine_set_str,
     cl_error_t,
     cl_load,
+    time_t,
     CL_DB_STDOPT,
 };
 
@@ -30,6 +38,36 @@ pub enum ScanResult {
     Whitelisted,
     /// Virus result, with detected name
     Virus(String),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum EngineValueType {
+    U32,
+    U64,
+    String,
+    Time,
+}
+
+pub struct ClamTime(time_t);
+
+impl ClamTime {
+    pub fn as_system_time(&self) -> time::SystemTime {
+        if self.0 >= 0 {
+            time::UNIX_EPOCH + time::Duration::from_secs(self.0 as u64)
+        }
+        else {
+            time::UNIX_EPOCH - time::Duration::from_secs((self.0 * -1) as u64)
+        }
+    }
+}
+
+
+
+pub enum EngineValue {
+    U32(u32),
+    U64(u64),
+    String(String),
+    Time(ClamTime),
 }
 
 /// Engine used for scanning files
@@ -259,6 +297,128 @@ impl Engine {
         };
         map_scan_result(result, virname)
     }
+
+    fn get(&self, field: cl_engine_field) -> Result<EngineValue, ClamError> {
+        unsafe {
+            match get_field_type(field) {
+                EngineValueType::U32 => {
+                    let mut err: c_int = 0;
+                    let value = cl_engine_get_num(self.handle, field, &mut err) as u32;
+                    if err != 0 {
+                        Err(ClamError::new(mem::transmute(err)))
+                    }
+                    else {
+                        Ok(EngineValue::U32(value))
+                    }
+                },
+                EngineValueType::U64 => {
+                    let mut err: c_int = 0;
+                    let value = cl_engine_get_num(self.handle, field, &mut err) as u64;
+                    if err != 0 {
+                        Err(ClamError::new(mem::transmute(err)))
+                    }
+                    else {
+                        Ok(EngineValue::U64(value))
+                    }
+                },
+                EngineValueType::String => {
+                    let mut err = 0;
+                    let value = cl_engine_get_str(self.handle, field, &mut err);
+                    if err != 0 {
+                        Err(ClamError::new(mem::transmute(err)))
+                    }
+                    else {
+                        Ok(EngineValue::String(CStr::from_ptr(value).to_str().unwrap().to_string()))
+                    }
+                },
+                EngineValueType::Time => {
+                    let mut err = 0;
+                    let value = cl_engine_get_num(self.handle, field, &mut err) as time_t;
+                    if err != 0 {
+                        Err(ClamError::new(mem::transmute(err)))
+                    }
+                    else {
+                        Ok(EngineValue::Time(ClamTime(value)))
+                    }
+                },
+            }
+        }
+    }
+
+    fn set(&self, field: cl_engine_field, value: EngineValue) -> Result<(), ClamError> {
+        let expected_type = get_field_type(field);
+        let actual_type = match &value {
+            EngineValue::U32(_) => EngineValueType::U32,
+            EngineValue::U64(_) => EngineValueType::U64,
+            EngineValue::String(_) => EngineValueType::String,
+            EngineValue::Time(_) => EngineValueType::Time,
+        };
+
+        if expected_type != actual_type {
+            return Err(ClamError::new(cl_error_t::CL_EARG));
+        }
+
+        unsafe {
+            match value {
+                EngineValue::U32(val) => {
+                    let err = cl_engine_set_num(self.handle, field, val as i64);
+                    if err != cl_error_t::CL_SUCCESS {
+                        Err(ClamError::new(err))
+                    }
+                    else {
+                        Ok(())
+                    }
+                },
+                EngineValue::U64(val) => {
+                    let err = cl_engine_set_num(self.handle, field, val as i64);
+                    if err != cl_error_t::CL_SUCCESS {
+                        Err(ClamError::new(err))
+                    }
+                    else {
+                        Ok(())
+                    }
+                },
+                EngineValue::String(val) => {
+                    let val = CString::new(val).unwrap();
+                    let err = cl_engine_set_str(self.handle, field, val.as_ptr());
+                    if err != cl_error_t::CL_SUCCESS {
+                        Err(ClamError::new(err))
+                    }
+                    else {
+                        Ok(())
+                    }
+                },
+                EngineValue::Time(ClamTime(val)) => {
+                    let err = cl_engine_set_num(self.handle, field, val as i64);
+                    if err != cl_error_t::CL_SUCCESS {
+                        Err(ClamError::new(err))
+                    }
+                    else {
+                        Ok(())
+                    }
+                },
+            }
+        }
+    }
+
+    pub fn database_version(&self) -> Result<u32, ClamError> {
+        if let EngineValue::U32(value) = self.get(cl_engine_field::CL_ENGINE_DB_VERSION)? {
+            Ok(value)
+        }
+        else {
+            Err(ClamError::new(cl_error_t::CL_EARG))
+        }
+    }
+
+    pub fn database_timestamp(&self) -> Result<time::SystemTime, ClamError> {
+        if let EngineValue::Time(value) = self.get(cl_engine_field::CL_ENGINE_DB_TIME)? {
+            Ok(value.as_system_time())
+        }
+        else {
+            Err(ClamError::new(cl_error_t::CL_EARG))
+        }
+    }
+
 }
 
 impl Drop for Engine {
@@ -266,6 +426,48 @@ impl Drop for Engine {
         unsafe {
             clamav_sys::cl_engine_free(self.handle);
         }
+    }
+}
+
+
+fn get_field_type(field: cl_engine_field) -> EngineValueType {
+    match field {
+        cl_engine_field::CL_ENGINE_MAX_SCANSIZE => EngineValueType::U64,
+        cl_engine_field::CL_ENGINE_MAX_FILESIZE => EngineValueType::U64,
+        cl_engine_field::CL_ENGINE_MAX_RECURSION => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_MAX_FILES => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_MIN_CC_COUNT => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_MIN_SSN_COUNT => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_PUA_CATEGORIES => EngineValueType::String,
+        cl_engine_field::CL_ENGINE_DB_OPTIONS => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_DB_VERSION => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_DB_TIME => EngineValueType::Time,
+        cl_engine_field::CL_ENGINE_AC_ONLY => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_AC_MINDEPTH => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_AC_MAXDEPTH => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_TMPDIR => EngineValueType::String,
+        cl_engine_field::CL_ENGINE_KEEPTMP => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_BYTECODE_SECURITY => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_BYTECODE_TIMEOUT => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_BYTECODE_MODE => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_MAX_EMBEDDEDPE => EngineValueType::U64,
+        cl_engine_field::CL_ENGINE_MAX_HTMLNORMALIZE => EngineValueType::U64,
+        cl_engine_field::CL_ENGINE_MAX_HTMLNOTAGS => EngineValueType::U64,
+        cl_engine_field::CL_ENGINE_MAX_SCRIPTNORMALIZE => EngineValueType::U64,
+        cl_engine_field::CL_ENGINE_MAX_ZIPTYPERCG => EngineValueType::U64,
+        cl_engine_field::CL_ENGINE_FORCETODISK => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_DISABLE_CACHE => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_DISABLE_PE_STATS => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_STATS_TIMEOUT => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_MAX_PARTITIONS => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_MAX_ICONSPE => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_MAX_RECHWP3 => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_MAX_SCANTIME => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_PCRE_MATCH_LIMIT => EngineValueType::U64,
+        cl_engine_field::CL_ENGINE_PCRE_RECMATCH_LIMIT => EngineValueType::U64,
+        cl_engine_field::CL_ENGINE_PCRE_MAX_FILESIZE => EngineValueType::U64,
+        cl_engine_field::CL_ENGINE_DISABLE_PE_CERTS => EngineValueType::U32,
+        cl_engine_field::CL_ENGINE_PE_DUMPCERTS => EngineValueType::U32,
     }
 }
 

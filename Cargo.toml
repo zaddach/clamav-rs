@@ -13,13 +13,12 @@ exclude = [
 ]
 
 [dependencies]
-clamav-sys = "0.0.4"
+clamav-sys = "0.0.5"
 bitflags = "1.2.1"
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-bindings = {path = "bindings", version = "0.5.4"}
-
+clamav-rs-bindings = "0.0.1"
 
 [dev-dependencies]
 tempfile = "3"
