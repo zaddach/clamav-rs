@@ -3,6 +3,8 @@ name = "clamav-rs-bindings"
 version = "0.5.5"
 authors = ["Jonas Zaddach <jonas.zaddach@gmail.com>"]
 edition = "2018"
+description = "Windows API bindings for the clamav-rs crate."
+license = "GPL-2.0"
 
 [dependencies]
 windows = "0.10.0"
