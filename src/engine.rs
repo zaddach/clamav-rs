@@ -419,6 +419,19 @@ impl Engine {
         }
     }
 
+
+    pub fn set_max_scansize(&self, max_scansize: u64) -> Result<(), ClamError> {
+        self.set(cl_engine_field::CL_ENGINE_MAX_SCANSIZE, EngineValue::U64(max_scansize))
+    }
+
+    pub fn max_scansize(&self) -> Result<u64, ClamError> {
+        if let EngineValue::U64(value) = self.get(cl_engine_field::CL_ENGINE_MAX_SCANSIZE)? {
+            Ok(value)
+        }
+        else {
+            Err(ClamError::new(cl_error_t::CL_EARG))
+        }
+    }
 }
 
 impl Drop for Engine {
