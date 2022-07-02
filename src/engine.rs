@@ -582,9 +582,9 @@ mod tests {
             .load_databases(EXAMPLE_DATABASE_PATH)
             .expect("failed to load db");
         scanner.compile().expect("failed to compile");
-        let settings: ScanSettings = Default::default();
+        let mut settings: ScanSettings = Default::default();
         let file = File::open(NAUGHTY_FILE_PATH).unwrap();
-        let result = scanner.scan_fileobj(&file, &settings);
+        let result = scanner.scan_fileobj(&file, &mut settings, Some(NAUGHTY_FILE_PATH));
         assert!(result.is_ok(), "scan should succeed");
         let hit = result.unwrap();
         match hit {
