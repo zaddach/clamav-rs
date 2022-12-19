@@ -1,6 +1,6 @@
 [package]
 name = "clamav-rs"
-description = "clamav bindings for Rust"
+description = "ClamAV bindings for Rust"
 version = "0.5.5"
 authors = ["Jonas Zaddach <jonas.zaddach@gmail.com", "Zachary Sims <zac@icebergdefender.com>"]
 homepage = "https://github.com/zaddach/clamav-rs"
