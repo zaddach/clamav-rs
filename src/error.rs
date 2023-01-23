@@ -8,13 +8,13 @@ use clamav_sys::cl_error_t;
 /// An error indicating a clam failure.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ClamError {
-    code: i32,
+    code: cl_error_t,
 }
 
 impl ClamError {
     pub fn new(native_err: cl_error_t) -> Self {
         ClamError {
-            code: native_err as i32,
+            code: native_err,
         }
     }
 
@@ -30,13 +30,13 @@ impl ClamError {
     }
 
     pub fn code(&self) -> i32 {
-        self.code
+        self.code as i32
     }
 }
 
 impl fmt::Display for ClamError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "cl_error {}: {}", self.code, self.string_error())
+        write!(f, "cl_error {}: {}", self.code as i32, self.string_error())
     }
 }
 
