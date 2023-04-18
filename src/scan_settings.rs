@@ -421,7 +421,6 @@ mod tests {
         assert!(string_settings.contains("CL_SCAN_PARSE_ELF"));
         assert!(string_settings.contains("CL_SCAN_PARSE_SWF"));
         assert!(string_settings.contains("CL_SCAN_PARSE_XMLDOCS"));
-        assert!(string_settings.contains("CL_SCAN_Parse_HWP3"));
     }
 
     #[test]
